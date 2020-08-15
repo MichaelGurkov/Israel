@@ -1,0 +1,91 @@
+---
+title: Israel Inflation
+---
+
+
+```{r setup, include=FALSE, eval=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+
+```{r load_libraries}
+
+library(tidyverse)
+
+library(lubridate)
+
+library(Quandl)
+
+
+```
+
+
+```{r import_data}
+
+Quandl.api_key("Vd7t2TFEjCvipyX7zPmh")
+
+inf_df = Quandl("ODA/ISR_PCPIEPCH")
+
+inf_df = inf_df %>% 
+  rename_all(tolower) %>% 
+  mutate(year = year(date)) %>% 
+  select(-date)
+
+
+target_inf_df = read_csv(paste0(
+  "C:\\Users\\Misha\\Documents\\",
+  "Israel\\data\\inf-target_df.csv"))
+
+
+```
+
+
+```{r setup}
+
+theme_set(theme_bw())
+
+```
+
+
+# Inflation rates plot
+
+```{r plot_inflation}
+
+inf_df %>% 
+  filter(year >= 1986 & year <= 2019) %>% 
+  ggplot(aes(x = year, y = value,fill = (value<=0))) + 
+  geom_bar(stat = "identity", width = 0.5) +
+  labs(title = "Inflation rates in Israel", x = "", y = "") +
+  scale_y_continuous(labels = scales::percent_format(
+    scale = 1,accuracy = 3)) +
+  scale_fill_manual(values = c("darkblue","red")) +
+  theme(legend.position = "none",
+        plot.title = element_text(hjust = 0.5,
+                                  family = "serif", size = 15),
+        axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+
+```
+
+
+```{r plot_infaltion_target}
+
+inf_df %>% 
+  filter(year >= 1992 & year <= 2020) %>% 
+  left_join(target_inf_df) %>% 
+  mutate(in_range = (value >= target_low & value <= target_high)) %>% 
+  ggplot(aes(x = year, y = value, color = in_range)) + 
+  geom_point(show.legend = FALSE) +
+  geom_errorbar(aes(x = year,ymin = target_low,
+                    ymax = target_high), color = "lightblue") + 
+  labs(title = "Inflation targeting in Israel", x = "", y = "") +
+  scale_y_continuous(labels = scales::percent_format(
+    scale = 1,accuracy = 3)) +
+  theme(legend.position = "none",
+        plot.title = element_text(hjust = 0.5,
+                                  family = "serif", size = 15),
+        axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+
+```
+
