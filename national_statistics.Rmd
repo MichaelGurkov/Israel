@@ -1,0 +1,213 @@
+---
+title: "National Statistics"
+---
+
+```{r, include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE, error = FALSE, warning = FALSE,
+                      message = FALSE)
+
+```
+
+```{r load_libraries}
+
+library(tidyverse)
+
+```
+
+```{r download_quandl_data}
+
+library(Quandl)
+
+Quandl.api_key("Vd7t2TFEjCvipyX7zPmh")
+
+ind_table = tribble(
+  ~ind_code, ~ind_name,
+  "BCA_NGDPD","ca_gdp",
+  "GGXWDG_NGDP","gov_gross_debt_gdp",
+  "GGXWDN_NGDP","gov_net_debt_gdp",
+  "GGR_NGDP", "gov_revenue",
+  "NGDPD","gdp_usd",
+  "NGDPPC","gdp_pc_nominal",
+  "NGDPRPC","gdp_pc_real",
+  "NGDPDPC", "gdp_pc_usd",
+  "NID_NGDP","investment_gdp",
+  "PPPSH","world_share_gdp_ppp"
+)
+
+
+na_accounts_df = pmap(ind_table,function(ind_code, ind_name){
+  
+  quandl_str = paste0("ODA/ISR_",ind_code)
+  
+  temp_df = Quandl(code = quandl_str,type = "raw")
+  
+  df = temp_df %>% 
+    rename_all(tolower) %>% 
+    rename(!!ind_name := "value")
+  
+  
+}) %>% 
+  reduce(full_join, by = "date")
+
+na_accounts_df = na_accounts_df %>% 
+  mutate(date = format(date, "%Y")) %>% 
+  pivot_longer(-date, names_to = "indicator")
+
+rm(ind_table)
+
+
+```
+
+
+```{r import_bis_data}
+
+library(MiscImport)
+
+bis_credit = import_bis_total_credit(paste0(
+  file.path(Sys.getenv("USERPROFILE")),
+  "\\OneDrive - Bank Of Israel\\Data\\BIS\\",
+  "WEBSTATS_TOTAL_CREDIT_DATAFLOW_csv_col.csv"),
+  my_frequency = "Quarterly")
+
+bis_credit =  bis_credit %>% 
+  filter(country == "Israel")
+  
+
+```
+
+
+```{r plot_gdp_pc_usd, eval=FALSE}
+
+na_accounts_df %>% 
+  filter(indicator == "gdp_pc_usd") %>% 
+  filter(date < 2020) %>% 
+  ggplot(aes(x = date, y = value, group = 1)) + 
+  geom_line() + 
+  xlab(NULL) + ylab(NULL) + ggtitle("Israel GDP per capita") + 
+  scale_y_continuous(labels = scales::dollar_format()) + 
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
+
+```
+
+
+```{r plot_gdp_usd}
+
+na_accounts_df %>% 
+  filter(indicator == "gdp_usd") %>% 
+  filter(date < 2020) %>% 
+  ggplot(aes(x = date, y = value, group = 1)) + 
+  geom_line() + 
+  xlab(NULL) + ylab(NULL) + ggtitle("Israel GDP (billions)") + 
+  scale_y_continuous(labels = scales::dollar_format(),n.breaks = 10) + 
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
+
+```
+
+
+
+```{r plot_gov_debt_gdp, eval=FALSE}
+
+na_accounts_df %>% 
+  filter(indicator %in% c("gov_gross_debt_gdp", "gov_net_debt_gdp")) %>% 
+  filter(date < 2020) %>% 
+  filter(complete.cases(.)) %>% 
+  ggplot(aes(x = date, y = value, group = indicator, color = indicator)) + 
+  geom_line() + 
+  scale_color_discrete(labels = c("Gross debt", "Net debt")) + 
+  xlab(NULL) + ylab(NULL) + ggtitle("Israel government debt (% GDP)") + 
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5),
+        legend.title = element_blank())
+
+```
+
+
+```{r plot_gov_debt_usd_bis}
+
+bis_credit %>% 
+  filter(borrowing_sector == "General government") %>% 
+  filter(unit_type == "US Dollar") %>% 
+  filter(valuation == "Nominal value") %>% 
+  ggplot(aes(x = date, y = total_credit)) + 
+  geom_line(color = "blue") + 
+  scale_x_yearqtr(n = 20,format = "%Y-Q%q") + 
+  scale_y_continuous(labels = scales::dollar_format()) + 
+  xlab(NULL) + ylab(NULL) + ggtitle("General government debt (billions USD)")
+
+
+```
+
+
+```{r plot_gdp_vs_gov_debt}
+
+bis_credit %>% 
+  filter(borrowing_sector == "General government") %>% 
+  filter(unit_type == "US Dollar") %>% 
+  filter(valuation == "Nominal value") %>% 
+  select(date, total_credit) %>% 
+  filter(quarters(date) == "Q4") %>% 
+  mutate(date = format(date, "%Y")) %>% 
+  inner_join(na_accounts_df %>% 
+               filter(indicator == "gdp_usd") %>% 
+               select(date, value), by = "date") %>% 
+  rename(gdp = value, gov_debt = total_credit) %>% 
+  pivot_longer(-date) %>% 
+  ggplot(aes(x = date, y = value, color = name, group = name)) + 
+  geom_line() + 
+  xlab(NULL) + ylab(NULL) + ggtitle("GDP vs Gov debt (billions)") + 
+  scale_y_continuous(labels = scales::dollar_format(),n.breaks = 10) + 
+  scale_color_manual(values = c("black", "blue")) + 
+  theme(legend.title = element_blank())
+
+```
+
+
+```{r plot_gov_debt_gdp_bis}
+
+bis_credit %>% 
+  filter(borrowing_sector == "General government") %>% 
+  filter(unit_type == "Percentage of GDP") %>% 
+  ggplot(aes(x = date, y = total_credit, color = valuation)) + 
+  geom_line() + 
+  scale_x_yearqtr(n = 20,format = "%Y-Q%q") + 
+  xlab(NULL) + ylab(NULL) + ggtitle("General government debt (%GDP)")
+
+
+```
+
+
+```{r plot_gov_debt_gdp_bis_usa, eval=FALSE}
+
+# oecd_countries = read_csv(paste0("C:\\Users\\micha\\OneDrive - Bank Of Israel",
+#                                  "\\Data\\OECD\\Country_Codes.csv")) %>%
+#   rename_all(tolower) %>%
+#   filter(oecd_member == 1) %>%
+#   mutate(country = str_replace_all(country, "\\s","_")) %>% 
+#   pull(country)
+
+temp = bis_credit %>% 
+  filter(date == max(date)) %>% 
+  filter(borrowing_sector == "General government") %>% 
+  filter(valuation == "Nominal value") %>% 
+  filter(unit_type == "Percentage of GDP") %>% 
+  filter(country %in% c(oecd_countries,
+                         "Emerging_market_economies_(aggregate)",
+                        "Advanced_economies"))
+temp = temp %>% 
+  left_join(credit_ratings %>% 
+              select(country, rating), by = "country")
+
+temp %>% 
+  ggplot(aes(x = reorder(country, total_credit),
+             y = total_credit,
+             fill = (country %in% c("United_States", "Israel")))) + 
+  geom_col() + 
+  geom_text(aes(label = rating, hjust = 0), color = "blue") + 
+  scale_fill_manual(values = c("grey","magenta")) +
+  coord_flip() + 
+  xlab(NULL) + ylab(NULL) + ggtitle("General government debt (%GDP) 2020 Q2") +
+  theme(legend.position = "none")
+
+
+```
+

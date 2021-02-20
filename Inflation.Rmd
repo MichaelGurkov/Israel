@@ -58,7 +58,8 @@ inf_df = cpi_df %>%
 target_inf_df = read_csv(paste0(
   file.path(Sys.getenv("USERPROFILE")),
   "\\Documents\\",
-  "Israel\\data\\inf-target_df.csv"))
+  "Israel\\data\\inf-target_df.csv"),
+  col_types = "cdd")
 
 
 ```
@@ -152,7 +153,7 @@ inf_df %>%
   labs(title = "Inflation rates in Israel", x = "", y = "") +
   scale_y_continuous(labels = scales::percent_format(
     scale = 1,accuracy = 3)) +
-  scale_fill_manual(infs = c("darkblue","red")) +
+  scale_fill_manual(values = c("darkblue","red")) +
   theme(legend.position = "none",
         plot.title = element_text(hjust = 0.5,
                                   family = "serif", size = 15),
@@ -166,12 +167,12 @@ inf_df %>%
 
 inf_df %>% 
   filter(year >= 1992) %>% 
-  left_join(target_inf_df) %>% 
+  left_join(target_inf_df, by = "year") %>% 
   mutate(in_range = (inf >= target_low & inf <= target_high)) %>% 
   ggplot(aes(x = as.character(year), y = inf, color = in_range)) + 
-  geom_point(show.legend = FALSE) +
   geom_errorbar(aes(x = as.character(year),ymin = target_low,
-                    ymax = target_high), color = "lightblue") + 
+                    ymax = target_high), color = "lightblue", size = 1) + 
+  geom_point(show.legend = FALSE, size = 2) +
   labs(title = "Inflation targeting in Israel", x = "", y = "") +
   scale_y_continuous(labels = scales::percent_format(
     scale = 1,accuracy = 3)) +
