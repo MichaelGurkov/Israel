@@ -1,0 +1,63 @@
+
+```{r load_libraries}
+
+library(Quandl)
+
+Quandl.api_key(Sys.getenv("Q_key"))
+
+library(tidyverse)
+
+library(lubridate)
+
+```
+
+
+```{r}
+
+codes = tribble(
+  ~name,~code,
+  "gdp_pc_nominal_lcu","NGDPPC",
+  "gdp_pc_real_lcu","NGDPRPC",
+  "gdp_pc_nominal_usd","NGDPDPC",
+)
+
+df = map2(codes$name,codes$code, function(name,code){
+  
+  temp_df = Quandl(paste0("ODA/ISR_", code),type = "raw")
+  
+  temp_df = temp_df %>% 
+    rename_all(tolower) %>% 
+    rename(!!name := 2)
+
+  
+})
+
+df = df %>% 
+  reduce(inner_join, by = "date")
+
+
+
+```
+
+
+```{r}
+
+df %>% 
+  pivot_longer(-date) %>% 
+  group_by(name) %>% 
+  arrange(date) %>% 
+  mutate(across(-date, ~ . / lag(.) - 1)) %>% 
+  ungroup() %>% 
+  filter(complete.cases(.)) %>% 
+  filter(date > as_date("1990-01-01")) %>% 
+  filter(!name == "gdp_pc_nominal_lcu") %>% 
+  ggplot(aes(x = date, y = value, fill = name)) + 
+  geom_col(position = "dodge") + 
+  scale_y_continuous(labels = scales::percent_format()) + 
+  xlab(NULL) + ylab(NULL) + ggtitle("Rates of change Israel GDP") + 
+  theme_bw() + 
+  theme(legend.position = "bottom", legend.title = element_blank())
+
+
+```
+
